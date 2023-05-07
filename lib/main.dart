@@ -57,20 +57,35 @@ class _HomeBodyState extends State<HomeBody> {
             child: Column(
               children: [
                 SimpleButton(
-                    title: "Fire one",
-                    onPressed: () {
-                      notificationService.fire();
-                    }),
+                  title: "Fire one",
+                  onPressed: () {
+                    notificationService.fire();
+                  },
+                ),
                 SimpleButton(
-                    title: "Setup alarms",
-                    onPressed: () {
-                      notificationService.setUpAlarms();
-                    }),
+                  title: "Setup alarms",
+                  onPressed: () {
+                    notificationService.setUpAlarms();
+                  },
+                ),
                 SimpleButton(
-                    title: "Setup alarm for tommorrow",
-                    onPressed: () {
-                      notificationService.setUpAlarmForTommorrow(8, 30);
-                    })
+                  title: "Setup alarm for tommorrow",
+                  onPressed: () {
+                    notificationService.setUpAlarmForTommorrow(8, 30);
+                  },
+                ),
+                SimpleButton(
+                  title: "Setup alarm repeatedly",
+                  onPressed: () {
+                    notificationService.setUpRepeatingAlarm();
+                  },
+                ),
+                SimpleButton(
+                  title: "Stop playing sound.",
+                  onPressed: () {
+                    notificationService.stop();
+                  },
+                )
               ],
             ),
           );

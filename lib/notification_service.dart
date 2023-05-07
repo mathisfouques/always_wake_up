@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:math';
 
 import 'package:always_wake_up/ring_path.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:timezone/data/latest.dart';
 import 'package:timezone/standalone.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -41,11 +43,30 @@ Future<void> _initializeTimeZone([String? path]) {
 class NotificationService {
   final List<Alarm> alarms;
   final FlutterLocalNotificationsPlugin localNotifInstance;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+
+  void _startPlayingSound() async {
+    if (!_isPlaying) {
+      _isPlaying = true;
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource("loud_clock_alarm.aiff"), volume: 1);
+    }
+  }
+
+  void _stopPlayingSound() async {
+    if (_isPlaying) {
+      _isPlaying = false;
+      await _audioPlayer.stop();
+    }
+  }
 
   NotificationService({
     required this.alarms,
     required this.localNotifInstance,
   });
+
+  stop() => _stopPlayingSound();
 
   Future<void> init() async {
     await _initializeTimeZone()
@@ -58,13 +79,24 @@ class NotificationService {
           requestSoundPermission: true,
           requestBadgePermission: false,
           requestAlertPermission: true,
-          onDidReceiveLocalNotification: (id, title, body, payload) {
-            print("Received local notif ios ");
+          requestCriticalPermission: true,
+          notificationCategories: [
+            const DarwinNotificationCategory(
+              "bonjour",
+              options: {DarwinNotificationCategoryOption.customDismissAction},
+            )
+          ],
+          onDidReceiveLocalNotification: (id, title, body, payload) async {
+            print("Did receive local notif");
+
+            _startPlayingSound();
           },
         ),
       ),
       onDidReceiveNotificationResponse: (details) {
         print("received notification response");
+
+        _stopPlayingSound();
       },
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
@@ -77,14 +109,14 @@ class NotificationService {
 
   void fire() {
     localNotifInstance.show(
-      0,
+      Random().nextInt(100),
       "Bonjour",
       "Simple alarm",
       const NotificationDetails(
         iOS: DarwinNotificationDetails(
           presentSound: true,
           sound: "${RingPath.loudAlarm}.aiff",
-          interruptionLevel: InterruptionLevel.active,
+          interruptionLevel: InterruptionLevel.critical,
         ),
       ),
     );
@@ -111,7 +143,7 @@ class NotificationService {
       const NotificationDetails(
         iOS: DarwinNotificationDetails(
           presentSound: true,
-          sound: "${RingPath.loudAlarm}.caf",
+          sound: "${RingPath.loudAlarm}.aiff",
           attachments: [],
         ),
       ),
@@ -121,27 +153,50 @@ class NotificationService {
   }
 
   void setUpAlarms() async {
-    await localNotifInstance.cancelAll();
+    Future.delayed(const Duration(seconds: 20))
+        .then((value) => _startPlayingSound());
 
-    for (Alarm alarm in alarms) {
-      if (alarm.isActive) {
-        localNotifInstance.zonedSchedule(
-          alarm.id,
-          "Alarme",
-          alarm.message,
-          TZDateTime.from(DateTime.now().add(const Duration(seconds: 1)),
-              getLocation("Europe/Paris")),
-          const NotificationDetails(
-            iOS: DarwinNotificationDetails(
-              presentSound: true,
-              sound: "${RingPath.loudAlarm}.caf",
-              attachments: [],
+    for (int index in List.generate(2, (index) => index)) {
+      localNotifInstance
+          .zonedSchedule(
+            index,
+            "Alarme",
+            "Bonjour",
+            TZDateTime.from(
+                DateTime.now().add(Duration(milliseconds: (index + 1) * 7800)),
+                getLocation("Europe/Paris")),
+            NotificationDetails(
+              iOS: DarwinNotificationDetails(
+                presentSound: true,
+                presentAlert: index == 0,
+                sound: "${RingPath.loudAlarm}.aiff",
+                interruptionLevel: InterruptionLevel.critical,
+                // attachments: [
+                //   const DarwinNotificationAttachment("${RingPath.loudAlarm}.aiff"),
+                // ],
+              ),
             ),
-          ),
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      }
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+          )
+          .then((value) => print("ok"));
     }
+  }
+
+  void setUpRepeatingAlarm() {
+    localNotifInstance.periodicallyShow(
+      Random().nextInt(100),
+      "Bonjour ",
+      "repeating",
+      RepeatInterval.everyMinute,
+      const NotificationDetails(
+        iOS: DarwinNotificationDetails(
+          presentSound: true,
+          presentAlert: true,
+          sound: "${RingPath.loudAlarm}.aiff",
+          interruptionLevel: InterruptionLevel.critical,
+        ),
+      ),
+    );
   }
 }
